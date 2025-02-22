@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>4-20mA Scale Conversion</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="manifest" href="manifest.json">
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js')
+                .then(reg => console.log('Service Worker Registered', reg))
+                .catch(err => console.log('Service Worker Registration Failed', err));
+        }
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 50px;
+            background-color: #121212;
+            color: #ffffff;
+        }
+        input[type=number], input[type=range] {
+            width: 300px;
+            margin: 10px;
+            background-color: #333;
+            color: #ffffff;
+            border: 1px solid #555;
+            padding: 5px;
+        }
+        label {
+            color: #ffffff;
+        }
+        canvas {
+            background-color: #222;
+            border: 1px solid #444;
+        }
+    </style>
+</head>
+<body>
+    <h2>4-20mA Scale Conversion</h2>
+    <label for="lowScale">Low Scale (4mA):</label>
+    <input type="number" id="lowScale" value="0" oninput="updateGraph()">
+    <br>
+    <label for="highScale">High Scale (20mA):</label>
+    <input type="number" id="highScale" value="100" oninput="updateGraph()">
+    <br>
+    <label for="currentInput">Current (mA):</label>
+    <input type="number" id="currentInput" min="4" max="20" step="0.001" value="12" oninput="syncSlider(); updateGraph()">
+    <br>
+    <input type="range" id="maLoop" min="4" max="20" value="12" step="0.001" oninput="syncInput(); updateGraph()">
+    <p>Current (mA): <span id="currentValue">12.000</span> mA</p>
+    <p>Percentage: <span id="percentage">50.000</span>%</p>
+    <p>Physical Value: <span id="fieldValue">75.000</span></p>
+    <br>
+    <label for="fieldValueInput">Physical Value:</label>
+    <input type="number" id="fieldValueInput" step="0.001" oninput="calculateFromFieldValue(this.value)">
+    <br>
+    <p>Calculated Current (mA): <span id="calculatedCurrent">12.000</span> mA</p>
+    
+    <canvas id="currentGraph" width="400" height="200"></canvas>
+    
+    <script>
+        let ctx = document.getElementById('currentGraph').getContext('2d');
+        let currentChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array.from({length: 100}, (_, i) => (i * 0.16 + 4).toFixed(2)),
+                datasets: [{
+                    label: 'Current vs. Physical Value',
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    data: [],
+                    pointRadius: 5,
+                    pointBackgroundColor: 'red'
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { title: { display: true, text: 'Current (mA)' } },
+                    y: { title: { display: true, text: 'Physical Value' } }
+                }
+            }
+        });
+
+        function syncSlider() {
+            document.getElementById("maLoop").value = document.getElementById("currentInput").value;
+        }
+
+        function syncInput() {
+            document.getElementById("currentInput").value = document.getElementById("maLoop").value;
+        }
+
+        function updateGraph() {
+            let lowScale = parseFloat(document.getElementById("lowScale").value) || 0;
+            let highScale = parseFloat(document.getElementById("highScale").value) || 100;
+            let current = parseFloat(document.getElementById("currentInput").value) || 12;
+
+            document.getElementById("currentValue").textContent = current.toFixed(3);
+            let percentage = ((current - 4) / (20 - 4)) * 100;
+            document.getElementById("percentage").textContent = percentage.toFixed(3);
+            let fieldValue = ((current - 4) / (20 - 4)) * (highScale - lowScale) + lowScale;
+            document.getElementById("fieldValue").textContent = fieldValue.toFixed(3);
+
+            let dataPoints = Array.from({length: 100}, (_, i) => {
+                let ma = i * 0.16 + 4;
+                return ((ma - 4) / (20 - 4)) * (highScale - lowScale) + lowScale;
+            });
+            
+            currentChart.data.datasets[0].data = dataPoints;
+            
+            let currentIndex = Math.round((current - 4) / 0.16);
+            currentChart.data.datasets[0].pointBackgroundColor = new Array(100).fill('rgba(75, 192, 192, 0.2)');
+            currentChart.data.datasets[0].pointBackgroundColor[currentIndex] = 'red';
+            
+            currentChart.update();
+        }
+
+        function calculateFromFieldValue(fieldVal) {
+            let lowScale = parseFloat(document.getElementById("lowScale").value) || 0;
+            let highScale = parseFloat(document.getElementById("highScale").value) || 100;
+            let calculatedCurrent = ((fieldVal - lowScale) / (highScale - lowScale)) * (20 - 4) + 4;
+            document.getElementById("calculatedCurrent").textContent = calculatedCurrent.toFixed(3);
+        }
+
+        updateGraph();
+    </script>
+</body>
+</html>
